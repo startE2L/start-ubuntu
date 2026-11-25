@@ -51,7 +51,8 @@ START-UBUNTU — Bash-скрипт для первоначальной наст�
 📥 Установка
 
 Запуск команды от имени root:
-bash <(curl -fsSL https://raw.githubusercontent.com/USERNAME/REPOSITORY/main/start-ubuntu)
+```bash <(curl -fsSL https://raw.githubusercontent.com/USERNAME/REPOSITORY/main/start-ubuntu)
+```
 
 ⚙️ Порядок настройки
 
