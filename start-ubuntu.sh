@@ -72,7 +72,7 @@ while true; do
 
     SERVER_MODE="${SERVER_MODE,,}"
 
-    if  "$SERVER_MODE" == "r" || "$SERVER_MODE" == "z" ; then
+    if [[ "$SERVER_MODE" == "r" || "$SERVER_MODE" == "z" ]]; then
         break
     fi
 
