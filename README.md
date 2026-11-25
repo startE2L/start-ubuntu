@@ -52,7 +52,7 @@ START-UBUNTU — Bash-скрипт для первоначальной наст�
 
 Запуск команды от имени root:
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/startE2L/start-ubuntu/main/start-ubuntu)
+bash <(curl -fsSL https://raw.githubusercontent.com/startE2L/start-ubuntu/main/start-ubuntu.sh)
 ```
 
 ⚙️ Порядок настройки
