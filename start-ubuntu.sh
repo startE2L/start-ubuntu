@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 # ==========================================
-# START-UBUNTU v3.1
+# START-UBUNTU v3.2
 # Russian / Foreign VPS
 # ==========================================
 
@@ -45,7 +45,7 @@ report() {
 # ROOT CHECK
 # ==========================================
 
-if  $EUID -ne 0 ; then
+if [[ "$EUID" -ne 0 ]]; then
     echo "Запусти скрипт от root."
     exit 1
 fi
@@ -58,7 +58,7 @@ mkdir -p "$BACKUP"
 
 echo
 echo "=========================================="
-echo "          START-UBUNTU v3.1"
+echo "          START-UBUNTU v3.2"
 echo "=========================================="
 echo
 echo "Выбери тип сервера:"
@@ -68,7 +68,7 @@ echo "z - Зарубежный сервер"
 echo
 
 while true; do
-    read -rp "Выполнить на заграничном или российском сервере? [z/r]: " SERVER_MODE
+    read -r -p "Выполнить на заграничном или российском сервере? [z/r]: " SERVER_MODE
 
     SERVER_MODE="${SERVER_MODE,,}"
 
@@ -79,7 +79,7 @@ while true; do
     warn "Введи только r или z."
 done
 
-if  "$SERVER_MODE" == "r" ; then
+if [[ "$SERVER_MODE" == "r" ]]; then
     good "Выбран российский сервер"
 else
     good "Выбран зарубежный сервер"
@@ -101,7 +101,7 @@ passwd root
 CURRENT_CLIENT_IP=""
 CURRENT_SSH_PORT=""
 
-if  -n "${SSH_CONNECTION:-}" ; then
+if [[ -n "${SSH_CONNECTION:-}" ]]; then
     read -r CURRENT_CLIENT_IP _ _ CURRENT_SSH_PORT <<< "$SSH_CONNECTION"
 fi
 
@@ -112,9 +112,9 @@ fi
 echo
 log "Введите параметры сервера"
 
-read -rp "Новый SSH-порт: " SSH_PORT
+read -r -p "Новый SSH-порт: " SSH_PORT
 
-if  ! "$SSH_PORT" =~ ^[0-9]+$  ||
+if [[ ! "$SSH_PORT" =~ ^[0-9]+$ ]] ||
    (( 10#$SSH_PORT < 1 || 10#$SSH_PORT > 65535 )); then
     bad "Некорректный SSH-порт"
     exit 1
@@ -122,12 +122,12 @@ fi
 
 SSH_PORT=$((10#$SSH_PORT))
 
-if  "$SERVER_MODE" == "r" ; then
+if [[ "$SERVER_MODE" == "r" ]]; then
 
-    read -rp "IPv4 второго сервера: " SERVER_IP
-    read -rp "Порт второго сервера: " SERVER_PORT
+    read -r -p "IPv4 второго сервера: " SERVER_IP
+    read -r -p "Порт второго сервера: " SERVER_PORT
 
-    if  ! "$SERVER_PORT" =~ ^[0-9]+$  ||
+    if [[ ! "$SERVER_PORT" =~ ^[0-9]+$ ]] ||
        (( 10#$SERVER_PORT < 1 || 10#$SERVER_PORT > 65535 )); then
         bad "Некорректный порт второго сервера"
         exit 1
@@ -148,7 +148,7 @@ fi
 # 5. SAVE CONFIGURATION
 # ==========================================
 
-if  "$SERVER_MODE" == "r" ; then
+if [[ "$SERVER_MODE" == "r" ]]; then
 
     cat > "$CONFIG" <<EOF
 SERVER_MODE=$SERVER_MODE
@@ -174,7 +174,7 @@ echo
 echo "Тип сервера: $SERVER_MODE"
 echo "SSH PORT: $SSH_PORT"
 
-if  "$SERVER_MODE" == "r" ; then
+if [[ "$SERVER_MODE" == "r" ]]; then
     echo "SERVER IP: $SERVER_IP"
     echo "SERVER PORT: $SERVER_PORT"
 fi
@@ -210,7 +210,7 @@ good "Базовые пакеты установлены"
 
 log "Установка LibreSpeed CLI"
 
-if  "$(uname -m)" != "x86_64" ; then
+if [[ "$(uname -m)" != "x86_64" ]]; then
     bad "LibreSpeed: требуется архитектура x86_64"
 else
 
@@ -220,22 +220,22 @@ else
         https://github.com/librespeed/speedtest-cli/releases/latest/download/librespeed-cli_1.0.14_linux_amd64.tar.gz \
         -O "$TMP_DIR/librespeed.tar.gz"; then
 
-        tar -xzf "$TMP_DIR/librespeed.tar.gz" -C "$TMP_DIR"
+        if tar -xzf "$TMP_DIR/librespeed.tar.gz" -C "$TMP_DIR"; then
 
-        ls -lah "$TMP_DIR"
+            if [[ -f "$TMP_DIR/librespeed-cli" ]]; then
 
-        if  -f "$TMP_DIR/librespeed-cli" ; then
+                install -m 755 \
+                    "$TMP_DIR/librespeed-cli" \
+                    /usr/local/bin/librespeed-cli
 
-            install -m 755 \
-                "$TMP_DIR/librespeed-cli" \
-                /usr/local/bin/librespeed-cli
+                good "LibreSpeed CLI установлен"
 
-            rm -f "$TMP_DIR/librespeed.tar.gz" "$TMP_DIR/LICENSE"
-
-            good "LibreSpeed CLI установлен"
+            else
+                bad "Файл librespeed-cli не найден"
+            fi
 
         else
-            bad "Файл librespeed-cli не найден"
+            bad "Ошибка распаковки LibreSpeed"
         fi
 
     else
@@ -254,16 +254,24 @@ log "Подготовка SSH"
 
 apt-get install -y openssh-server
 
-cp -a "$SSHD_CONFIG" "$BACKUP/sshd_config"
+# Резервная копия основного конфига
+if [[ ! -f "$BACKUP/sshd_config" ]]; then
+    cp -a "$SSHD_CONFIG" "$BACKUP/sshd_config"
+fi
 
+# Резервная копия дополнительных конфигов
 if compgen -G "/etc/ssh/sshd_config.d/*.conf" >/dev/null; then
-    mkdir -p "$BACKUP/sshd_config.d"
-    cp -a /etc/ssh/sshd_config.d/*.conf "$BACKUP/sshd_config.d/"
+
+    if [[ ! -d "$BACKUP/sshd_config.d" ]]; then
+        mkdir -p "$BACKUP/sshd_config.d"
+        cp -a /etc/ssh/sshd_config.d/*.conf "$BACKUP/sshd_config.d/"
+    fi
+
 fi
 
 SOCKET_MODE=0
 
-if systemctl is-active --quiet ssh.socket || \
+if systemctl is-active --quiet ssh.socket ||
    systemctl is-enabled --quiet ssh.socket 2>/dev/null; then
     SOCKET_MODE=1
 fi
@@ -272,8 +280,10 @@ if (( SOCKET_MODE == 1 )); then
 
     mkdir -p /etc/systemd/system/ssh.socket.d
 
-    cp -a /etc/systemd/system/ssh.socket.d \
-        "$BACKUP/ssh.socket.d" 2>/dev/null || true
+    if [[ -d /etc/systemd/system/ssh.socket.d ]] &&
+       [[ ! -d "$BACKUP/ssh.socket.d" ]]; then
+        cp -a /etc/systemd/system/ssh.socket.d "$BACKUP/ssh.socket.d"
+    fi
 
     cat > /etc/systemd/system/ssh.socket.d/override.conf <<EOF
 [Socket]
@@ -285,9 +295,23 @@ EOF
 
 else
 
+    # Удаляем старые Port из основного конфига
     sed -i -E \
-        '/^:space:*Port:space:+/d' \
+        '/^[[:space:]]*Port[[:space:]]+/Id' \
         "$SSHD_CONFIG"
+
+    # Удаляем Port из дополнительных конфигов
+    shopt -s nullglob
+
+    SSH_DROPINS=(/etc/ssh/sshd_config.d/*.conf)
+
+    for file in "${SSH_DROPINS[@]}"; do
+        sed -i -E \
+            '/^[[:space:]]*Port[[:space:]]+/Id' \
+            "$file"
+    done
+
+    shopt -u nullglob
 
     echo "Port $SSH_PORT" >> "$SSHD_CONFIG"
 
@@ -307,7 +331,7 @@ good "Новая конфигурация SSH подготовлена"
 # ONLY RUSSIAN SERVER
 # ==========================================
 
-if  "$SERVER_MODE" == "r" ; then
+if [[ "$SERVER_MODE" == "r" ]]; then
 
     log "Установка nftables"
 
@@ -317,7 +341,8 @@ if  "$SERVER_MODE" == "r" ; then
 
     mkdir -p /etc/nftables.d
 
-    if  -f "$NFT_CONF" && ! -f "$BACKUP/nftables.conf" ; then
+    if [[ -f "$NFT_CONF" ]] &&
+       [[ ! -f "$BACKUP/nftables.conf" ]]; then
         cp -a "$NFT_CONF" "$BACKUP/nftables.conf"
     fi
 
@@ -329,10 +354,10 @@ EOF
     sysctl --system
 
     # Убираем flush ruleset
-    if  -f "$NFT_CONF" ; then
+    if [[ -f "$NFT_CONF" ]]; then
 
         sed -i -E \
-            '/^:space:*flush ruleset:space:*$/d' \
+            '/^[[:space:]]*flush ruleset[[:space:]]*$/Id' \
             "$NFT_CONF"
 
         sed -i \
@@ -432,12 +457,12 @@ allow_udp() {
 
 log "Защита текущего SSH-соединения"
 
-if  -n "$CURRENT_CLIENT_IP" ; then
+if [[ -n "$CURRENT_CLIENT_IP" ]]; then
 
     ufw allow from "$CURRENT_CLIENT_IP" \
         to any port "$SSH_PORT" proto tcp
 
-    if  "$CURRENT_SSH_PORT" =~ ^[0-9]+$ ; then
+    if [[ "$CURRENT_SSH_PORT" =~ ^[0-9]+$ ]]; then
 
         ufw allow from "$CURRENT_CLIENT_IP" \
             to any port "$CURRENT_SSH_PORT" proto tcp
@@ -475,7 +500,7 @@ allow_udp 443
 # FOREIGN SERVER EXTRA PORTS
 # ==========================================
 
-if  "$SERVER_MODE" == "z" ; then
+if [[ "$SERVER_MODE" == "z" ]]; then
 
     log "Открытие дополнительных UDP-портов"
 
@@ -491,7 +516,7 @@ fi
 # RUSSIAN SERVER EXTRA PORTS
 # ==========================================
 
-if  "$SERVER_MODE" == "r" ; then
+if [[ "$SERVER_MODE" == "r" ]]; then
 
     log "Открытие порта второго сервера"
 
@@ -615,9 +640,9 @@ echo "=========================================="
 echo "               3X-UI KIT"
 echo "=========================================="
 
-read -rp "Установить KIT? [y/n]: " INSTALL_KIT
+read -r -p "Установить KIT? [y/n]: " INSTALL_KIT
 
-if  "$INSTALL_KIT" =~ ^[Yy]$ ; then
+if [[ "$INSTALL_KIT" =~ ^[Yy]$ ]]; then
 
     log "Загрузка установщика KIT"
 
@@ -660,9 +685,9 @@ if (( KIT_INSTALLED == 1 )); then
     echo "           KIT UFW CLEANUP"
     echo "=========================================="
 
-    read -rp "Удалить открытые KIT порты? [y/n]: " CLEAN_KIT
+    read -r -p "Удалить открытые KIT порты? [y/n]: " CLEAN_KIT
 
-    if  "$CLEAN_KIT" =~ ^[Yy]$ ; then
+    if [[ "$CLEAN_KIT" =~ ^[Yy]$ ]]; then
 
         log "Проверка правил UFW после KIT"
 
@@ -821,7 +846,7 @@ report "HTTPS 443/tcp" \
 report "HTTPS 443/udp" \
     bash -c 'ufw status | grep -Fq "443/udp"'
 
-if  "$SERVER_MODE" == "r" ; then
+if [[ "$SERVER_MODE" == "r" ]]; then
 
     report "IP forwarding включён" \
         test "$(sysctl -n net.ipv4.ip_forward)" = "1"
@@ -864,7 +889,7 @@ echo "=========================================="
 echo "             SERVER SETTINGS"
 echo "=========================================="
 
-if  "$SERVER_MODE" == "r" ; then
+if [[ "$SERVER_MODE" == "r" ]]; then
     echo "Тип: Российский сервер"
     echo "SSH PORT: $SSH_PORT"
     echo "SERVER IP: $SERVER_IP"
@@ -888,11 +913,12 @@ echo
 echo "Конфигурация: $CONFIG"
 echo "Резервные копии: $BACKUP"
 
-if  "$SERVER_MODE" == "r" ; then
+if [[ "$SERVER_MODE" == "r" ]]; then
     echo "NAT: $NFT_FILE"
 fi
 
 echo
+
 if (( FAIL == 0 )); then
     echo -e "${GREEN}НАСТРОЙКА ЗАВЕРШЕНА УСПЕШНО!${NC}"
 else
